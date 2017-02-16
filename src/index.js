@@ -30,11 +30,10 @@ require( 'promise/polyfill' );
 					if ( dep.substr(0, 2) === 'v!' ) {
 						const path = dep.substr(2);
 						const name = VueRequire.pathToName( path );
-						Vue.component( name, function( resolve, reject ) {
-							VueRequire.loadComponent( path+'.vue', { name, require })
-								.then( resolve, reject );
+
+						cb( function( resolve, reject ) {
+							return VueRequire.loadComponent( path+'.vue', { name, require });
 						});
-						cb();
 						return;
 					}
 					if ( options.map && options.map[ dep ] )
@@ -47,7 +46,6 @@ require( 'promise/polyfill' );
 				const link = links[ i ];
 				if ( ( link.rel === 'template/vue' ) || ( link.type === 'text/vue' ) ) {
 					const name = link.getAttribute( 'name' ) || this.pathToName( link.href );
-					console.log( name );
 					Vue.component( name, function( resolve, reject ) {
 						VueRequire.loadComponent( link.href, { name, require })
 							.then( resolve, reject );
@@ -59,23 +57,13 @@ require( 'promise/polyfill' );
 		loadComponent( path, options ) {
 			return request( path )
 				.then(function( res ) {
-					console.log( res );
 					const vueComponentElement = parse( res );
 					const compiler = new Compiler( vueComponentElement );
 					return compiler.compile( options )
 						.then(function( component ) {
-							console.log( component );
 							return component;
 						})
 					;
-				})
-			;
-		},
-		registerComponent( path, options ) {
-			return VueRequire.loadComponent( path, options )
-				.then(function( component ) {
-					Vue.component( options.name, component );
-					return component;
 				})
 			;
 		},
@@ -84,9 +72,9 @@ require( 'promise/polyfill' );
 		},
 		load( name, req, onload, config ) {
 			const require = requireHelper.buildDependencyRequire({ require: req });
-			VueRequire.registerComponent( name+'.vue', { name, config, require } )
-				.then( onload, onload.error )
-			;
+			onload(function() {
+				return VueRequire.loadComponent( name+'.vue', { name, config, require } );
+			});
 		}
 	}
 	return VueRequire;

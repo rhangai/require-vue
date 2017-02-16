@@ -28,7 +28,7 @@ module.exports = class {
 	compileScript( output, options ) {
 		const script = this._componentElement.querySelector( 'script' );
 		if ( !script )
-			return Promise.reject();
+			return;
 		
 		const transpiledScript = buble.transform( script.innerHTML );
 
@@ -82,11 +82,16 @@ module.exports = class {
 		const output = {
 			component: {}
 		};
-		return Promise.all([
-			this.compileScript( output, options ),
-			this.compileTemplate( output, options ),
-			this.compileStyle( output, options )
-		]).then(() => { return output.component; });
+		return Promise.resolve()
+			.then(() => {
+				return Promise.all([
+					this.compileScript( output, options ),
+					this.compileTemplate( output, options ),
+					this.compileStyle( output, options )
+				]);
+			})
+			.then(() => { return output.component; })
+		;
 	}
 	
 };
