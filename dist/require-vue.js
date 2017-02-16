@@ -13021,9 +13021,7 @@ module.exports = function () {
 		key: 'compileTemplate',
 		value: function compileTemplate(output) {
 			var template = this._componentElement.querySelector('template');
-			var tag = template.getAttribute('tag') || 'div';
-			var classes = template.getAttribute('class') || '';
-			output.component.template = '<' + tag + ' class=' + JSON.stringify(classes + " " + this._guid) + '>' + template.innerHTML + '</' + tag + '>';
+			output.component.template = template.innerHTML;
 		}
 	}, {
 		key: 'compileStyle',
@@ -24880,14 +24878,8 @@ require('promise/polyfill');
 	}
 
 	var VueRequire = {
-		registerAllComponentsTags: function registerAllComponentsTags(options) {
-			var _this = this;
-
-			options = options || {};
-			var links = document.getElementsByTagName('link');
-			var tags = [];
-			var g = options.global || window;
-
+		options: {},
+		_createRequire: function _createRequire(options) {
 			var require = options.require || requireHelper.buildDependencyRequire({
 				require: function (_require) {
 					function require(_x, _x2, _x3) {
@@ -24904,32 +24896,40 @@ require('promise/polyfill');
 					if (dep.substr(0, 2) === 'v!') {
 						var path = dep.substr(2);
 						var name = VueRequire.pathToName(path);
-
-						cb(function (resolve, reject) {
-							return VueRequire.loadComponent(path + '.vue', { name: name, require: require });
-						});
+						cb(VueRequire.createLazyComponent(path + '.vue', { name: name, require: require }));
 						return;
 					}
-					if (options.map && options.map[dep]) cb(g[options.map[dep]]);else cb(g[dep]);
+					if (options.map && options.map[dep]) cb(g[options.map[dep]]);else if (VueRequire.options.map && VueRequire.options.map[dep]) cb(g[VueRequire.options.map[dep]]);else cb(g[dep]);
 				})
 			});
-
-			var _loop = function _loop(i, len) {
+			return require;
+		},
+		registerAllComponentsTags: function registerAllComponentsTags(options) {
+			options = options || {};
+			var links = document.getElementsByTagName('link');
+			var tags = [];
+			var g = options.global || window;
+			var require = VueRequire._createRequire(options);
+			for (var i = 0, len = links.length; i < len; ++i) {
 				var link = links[i];
 				if (link.rel === 'template/vue' || link.type === 'text/vue') {
-					var name = link.getAttribute('name') || _this.pathToName(link.href);
-					Vue.component(name, function (resolve, reject) {
-						VueRequire.loadComponent(link.href, { name: name, require: require }).then(resolve, reject);
-					});
+					var name = link.getAttribute('name') || this.pathToName(link.href);
+					Vue.component(name, VueRequire.createLazyComponent(link.href, { name: name, require: require }));
 				}
-			};
-
-			for (var i = 0, len = links.length; i < len; ++i) {
-				_loop(i, len);
 			}
 			return Promise.resolve();
 		},
+		createLazyComponent: function createLazyComponent(path, options) {
+			return function (resolve, reject) {
+				return VueRequire.loadComponent(path, options);
+			};
+		},
 		loadComponent: function loadComponent(path, options) {
+			options = options || {};
+			options = {
+				name: options.name,
+				require: this._createRequire(options)
+			};
 			return request(path).then(function (res) {
 				var vueComponentElement = parse(res);
 				var compiler = new Compiler(vueComponentElement);
@@ -24943,9 +24943,7 @@ require('promise/polyfill');
 		},
 		load: function load(name, req, onload, config) {
 			var require = requireHelper.buildDependencyRequire({ require: req });
-			onload(function () {
-				return VueRequire.loadComponent(name + '.vue', { name: name, config: config, require: require });
-			});
+			onload(VueRequire.createLazyComponent(name + '.vue', { name: name, config: config, require: require }));
 		}
 	};
 	return VueRequire;
