@@ -1,0 +1,15 @@
+# Tmp files
+*~
+.\#*
+\#*
+
+# package files
+node_modules/
+bower_components/
+
+# Test files
+/test/
+
+# composer
+composer.phar
+/vendor
