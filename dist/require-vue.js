@@ -13001,7 +13001,7 @@ module.exports = function () {
 		key: 'compileScript',
 		value: function compileScript(output, options) {
 			var script = this._componentElement.querySelector('script');
-			if (!script) return Promise.reject();
+			if (!script) return;
 
 			var transpiledScript = buble.transform(script.innerHTML);
 
@@ -13009,13 +13009,9 @@ module.exports = function () {
 			var code = transpiledScript.code.replace(/require\(\s*([\"'])((?:\\\1|.)*?)\1\s*\)/g, function (match, quote, moduleName) {
 				requires.push(moduleName);
 			});
-			return new Promise(function (resolve, reject) {
-				options.require(['require'].concat(requires), function (require) {
-					resolve(require);
-				}, reject);
-			}).then(function (require) {
-				var isolatedVm = new Function('require', VM_HEADER + transpiledScript.code + VM_FOOTER);
-				var vmComponent = isolatedVm(require);
+			return options.require(requires).then(function (require) {
+				var isolatedVm = new Function('global', 'require', VM_HEADER + transpiledScript.code + VM_FOOTER);
+				var vmComponent = isolatedVm(options.global || window, require);
 				for (var key in vmComponent) {
 					output.component[key] = vmComponent[key];
 				}
@@ -13058,10 +13054,14 @@ module.exports = function () {
 	}, {
 		key: 'compile',
 		value: function compile(options) {
+			var _this = this;
+
 			var output = {
 				component: {}
 			};
-			return Promise.all([this.compileScript(output, options), this.compileTemplate(output, options), this.compileStyle(output, options)]).then(function () {
+			return Promise.resolve().then(function () {
+				return Promise.all([_this.compileScript(output, options), _this.compileTemplate(output, options), _this.compileStyle(output, options)]);
+			}).then(function () {
 				return output.component;
 			});
 		}
@@ -24861,9 +24861,15 @@ var define;
 'use strict';
 
 require('promise/polyfill');
-
-define(['vue'], function (Vue) {
+(function (root, factory) {
+	if (typeof define === 'function' && define.amd) {
+		define(['vue'], factory);
+	} else {
+		root.VueRequire = factory(root.Vue);
+	}
+})(undefined || window, function (Vue) {
 	var request = require('./request');
+	var requireHelper = require('./requireHelper');
 	var Compiler = require('./Compiler');
 
 	var parser = new DOMParser();
@@ -24873,40 +24879,125 @@ define(['vue'], function (Vue) {
 		return doc.body;
 	}
 
-	return {
-		load: function load(name, req, onload, config) {
-			request(name + '.vue', function (err, res) {
-				if (err) return onload.error(err);
-				try {
-					var vueComponentElement = parse(res);
-					var compiler = new Compiler(vueComponentElement);
-					compiler.compile({ name: name, require: req, config: config }).then(function (component) {
-						Vue.component(name, component);
-						onload(component);
-					}, function (err) {
-						onload.error(err);
+	var VueRequire = {
+		registerAllComponentsTags: function registerAllComponentsTags(options) {
+			var _this = this;
+
+			options = options || {};
+			var links = document.getElementsByTagName('link');
+			var tags = [];
+			var g = options.global || window;
+
+			var require = options.require || requireHelper.buildDependencyRequire({
+				require: function (_require) {
+					function require(_x, _x2, _x3) {
+						return _require.apply(this, arguments);
+					}
+
+					require.toString = function () {
+						return _require.toString();
+					};
+
+					return require;
+				}(function (deps, cb, errCb) {
+					var dep = deps[0];
+					if (dep.substr(0, 2) === 'v!') {
+						var path = dep.substr(2);
+						var name = VueRequire.pathToName(path);
+
+						cb(function (resolve, reject) {
+							return VueRequire.loadComponent(path + '.vue', { name: name, require: require });
+						});
+						return;
+					}
+					if (options.map && options.map[dep]) cb(g[options.map[dep]]);else cb(g[dep]);
+				})
+			});
+
+			var _loop = function _loop(i, len) {
+				var link = links[i];
+				if (link.rel === 'template/vue' || link.type === 'text/vue') {
+					var name = link.getAttribute('name') || _this.pathToName(link.href);
+					Vue.component(name, function (resolve, reject) {
+						VueRequire.loadComponent(link.href, { name: name, require: require }).then(resolve, reject);
 					});
-				} catch (err) {
-					onload.error(err);
 				}
+			};
+
+			for (var i = 0, len = links.length; i < len; ++i) {
+				_loop(i, len);
+			}
+			return Promise.resolve();
+		},
+		loadComponent: function loadComponent(path, options) {
+			return request(path).then(function (res) {
+				var vueComponentElement = parse(res);
+				var compiler = new Compiler(vueComponentElement);
+				return compiler.compile(options).then(function (component) {
+					return component;
+				});
+			});
+		},
+		pathToName: function pathToName(path) {
+			return path;
+		},
+		load: function load(name, req, onload, config) {
+			var require = requireHelper.buildDependencyRequire({ require: req });
+			onload(function () {
+				return VueRequire.loadComponent(name + '.vue', { name: name, config: config, require: require });
 			});
 		}
 	};
+	return VueRequire;
 });
 
-},{"./Compiler":107,"./request":110,"promise/polyfill":106}],110:[function(require,module,exports){
+},{"./Compiler":107,"./request":110,"./requireHelper":111,"promise/polyfill":106}],110:[function(require,module,exports){
 'use strict';
 
-function request(url, cb) {
-	var xhr = new XMLHttpRequest();
-	xhr.onreadystatechange = function () {
-		if (xhr.readyState >= 4) {
-			if (xhr.status == 200) cb(null, xhr.responseText);else cb(new Error());
-		}
-	};
-	xhr.open('GET', url);
-	xhr.send();
+require('promise/polyfill');
+function request(url) {
+	return new Promise(function (resolve, reject) {
+		var xhr = new XMLHttpRequest();
+		xhr.onreadystatechange = function () {
+			if (xhr.readyState >= 4) {
+				if (xhr.status == 200) resolve(xhr.responseText);else reject(new Error());
+			}
+		};
+		xhr.open('GET', url);
+		xhr.send();
+	});;
 };
 module.exports = request;
+
+},{"promise/polyfill":106}],111:[function(require,module,exports){
+"use strict";
+
+function buildDependencyRequire(options) {
+	options = options || {};
+	var req = options.require;
+	return function (deps) {
+		deps = deps || [];
+
+		var resolvedMap = {};
+		var module = deps.map(function (dep, i) {
+			return new Promise(function (resolve, reject) {
+				req([dep], function (v) {
+					resolvedMap[dep] = v;
+					resolve();
+				}, reject);
+			});
+		});
+		return Promise.all(module).then(function (d) {
+			return function (name) {
+				return resolvedMap[name];
+			};
+		});
+		;
+	};
+}
+
+module.exports = {
+	buildDependencyRequire: buildDependencyRequire
+};
 
 },{}]},{},[109]);
