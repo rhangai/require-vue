@@ -19,8 +19,9 @@ define(['vue'], function( Vue ) {
 				try {
 					const vueComponentElement = parse( res );
 					const compiler = new Compiler( vueComponentElement );
-					compiler.compile()
+					compiler.compile({ name, require: req, config })
 						.then(function( component ) {
+							console.log( component );
 							Vue.component( name, component );
 							onload( component );
 						}, function( err ) {

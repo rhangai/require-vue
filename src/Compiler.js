@@ -25,27 +25,37 @@ module.exports = class {
 		this._componentElement = componentElement;
 	}
 
-	compileScript( component ) {
+	compileScript( output, options ) {
 		const script = this._componentElement.querySelector( 'script' );
 		if ( !script )
 			return Promise.reject();
-
+		
 		const transpiledScript = buble.transform( script.innerHTML );
-		console.log( transpiledScript );
-		const isolatedVm       = new Function( VM_HEADER+transpiledScript.code+VM_FOOTER );
-		const vmComponent      = isolatedVm();
-		for ( let key in vmComponent )
-			component[ key ] = vmComponent[ key ];
+
+		const requires = [];
+		const code = transpiledScript.code.replace( /require\(\s*([\"'])((?:\\\1|.)*?)\1\s*\)/g, function( match, quote, moduleName ) {
+			requires.push( moduleName );
+		});
+		return new Promise(function( resolve, reject ) {
+			options.require( ['require'].concat(requires), function( require ) {
+				resolve( require );
+			}, reject );
+		}).then( function( require ) {
+			const isolatedVm       = new Function( 'require', VM_HEADER+transpiledScript.code+VM_FOOTER );
+			const vmComponent      = isolatedVm( require );
+			for ( let key in vmComponent )
+				output.component[ key ] = vmComponent[ key ];
+		});
 	}
 
-	compileTemplate( component ) {
+	compileTemplate( output ) {
 		const template = this._componentElement.querySelector( 'template' );
 		const tag      = template.getAttribute( 'tag' ) || 'div';
 		const classes  = template.getAttribute( 'class' )||'';
-		component.template = `<${tag} class=${JSON.stringify(classes+" "+this._guid)}>${template.innerHTML}</${tag}>`;
+		output.component.template = `<${tag} class=${JSON.stringify(classes+" "+this._guid)}>${template.innerHTML}</${tag}>`;
 	}
 
-	compileStyle( component ) {
+	compileStyle( output ) {
 		const style = this._componentElement.querySelector( 'style' );
 		if ( !style )
 			return;
@@ -70,13 +80,15 @@ module.exports = class {
 		});
 	}
 
-	compile() {
-		const component = {};
+	compile( options ) {
+		const output = {
+			component: {}
+		};
 		return Promise.resolve()
-			.then(() => this.compileScript( component ))
-			.then(() => this.compileTemplate( component ))
-			.then(() => this.compileStyle( component ))
-			.then(() => { return component; })
+			.then(() => this.compileScript( output, options ))
+			.then(() => this.compileTemplate( output, options ))
+			.then(() => this.compileStyle( output, options ))
+			.then(() => { return output.component; })
 		;
 	}
 	
