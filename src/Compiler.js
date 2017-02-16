@@ -36,16 +36,14 @@ module.exports = class {
 		const code = transpiledScript.code.replace( /require\(\s*([\"'])((?:\\\1|.)*?)\1\s*\)/g, function( match, quote, moduleName ) {
 			requires.push( moduleName );
 		});
-		return new Promise(function( resolve, reject ) {
-			options.require( ['require'].concat(requires), function( require ) {
-				resolve( require );
-			}, reject );
-		}).then( function( require ) {
-			const isolatedVm       = new Function( 'require', VM_HEADER+transpiledScript.code+VM_FOOTER );
-			const vmComponent      = isolatedVm( require );
-			for ( let key in vmComponent )
-				output.component[ key ] = vmComponent[ key ];
-		});
+		return options.require( requires )
+			.then( function( require ) {
+				const isolatedVm       = new Function( 'global', 'require', VM_HEADER+transpiledScript.code+VM_FOOTER );
+				const vmComponent      = isolatedVm( options.global || window, require );
+				for ( let key in vmComponent )
+					output.component[ key ] = vmComponent[ key ];
+			})
+		;
 	}
 
 	compileTemplate( output ) {

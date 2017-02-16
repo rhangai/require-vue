@@ -4,8 +4,8 @@
   "description": "require-vue ========================",
   "main": "dist/require-vue.js",
   "scripts": {
-    "build:prod": "browserify src/index.js -o dist/require-vue.min.js -t [ babelify --presets [ es2015 ] ] -p [minifyify --no-map]",
-    "build:dev": "browserify src/index.js -o dist/require-vue.js -t [ babelify --presets [ es2015 ] ]",
+    "build:prod": "browserify --external vue src/index.js -o dist/require-vue.min.js -t [ babelify --presets [ es2015 ] ] -p [minifyify --no-map]",
+    "build:dev": "browserify --external vue src/index.js -o dist/require-vue.js -t [ babelify --presets [ es2015 ] ]",
     "build": "npm run build:prod && npm run build:dev",
     "test": "echo \"Error: no test specified\" && exit 1",
     "preversion": "npm run build && git add --force dist"
