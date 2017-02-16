@@ -84,12 +84,11 @@ module.exports = class {
 		const output = {
 			component: {}
 		};
-		return Promise.resolve()
-			.then(() => this.compileScript( output, options ))
-			.then(() => this.compileTemplate( output, options ))
-			.then(() => this.compileStyle( output, options ))
-			.then(() => { return output.component; })
-		;
+		return Promise.all([
+			this.compileScript( output, options ),
+			this.compileTemplate( output, options ),
+			this.compileStyle( output, options )
+		]).then(() => { return output.component; });
 	}
 	
 };
