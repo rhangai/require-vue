@@ -48,9 +48,7 @@ module.exports = class {
 
 	compileTemplate( output ) {
 		const template = this._componentElement.querySelector( 'template' );
-		const tag      = template.getAttribute( 'tag' ) || 'div';
-		const classes  = template.getAttribute( 'class' )||'';
-		output.component.template = `<${tag} class=${JSON.stringify(classes+" "+this._guid)}>${template.innerHTML}</${tag}>`;
+		output.component.template = template.innerHTML;
 	}
 
 	compileStyle( output ) {
