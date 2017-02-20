@@ -4,11 +4,12 @@
   "description": "require-vue ========================",
   "main": "dist/require-vue.js",
   "scripts": {
-    "build:prod": "browserify --external vue src/index.js -o dist/require-vue.min.js -t [ babelify --presets [ es2015 ] ] -p [minifyify --no-map]",
-    "build:dev": "browserify --external vue src/index.js -o dist/require-vue.js -t [ babelify --presets [ es2015 ] ]",
+    "build:prod": "browserify --external vue src/index.js -o dist/require-vue.min.js -t [ babelify --presets [ es2015 ] ] -t envify -g uglifyify",
+    "build:dev": "browserify --external vue src/index.js -o dist/require-vue.js -t [ babelify --presets [ es2015 ] ] -t envify",
     "build": "npm run build:prod && npm run build:dev",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "preversion": "npm run build && git add --force dist"
+    "preversion": "npm run build && git add --force dist",
+    "start": "http-server test"
   },
   "author": "renanhangai",
   "license": "ISC",
@@ -17,9 +18,11 @@
     "babelify": "^7.3.0",
     "browserify": "^14.1.0",
     "buble": "^0.15.2",
+    "envify": "^4.0.0",
     "less": "^2.7.2",
     "minifyify": "^7.3.4",
-    "promise": "^7.1.1"
+    "promise": "^7.1.1",
+    "uglifyify": "^3.0.4"
   },
   "directories": {
     "test": "test"
@@ -31,7 +34,6 @@
     "buble": "^0.15.2",
     "deamdify": "^0.2.0",
     "less": "^2.7.2",
-    "minifyify": "^7.3.4",
     "promise": "^7.1.1"
   },
   "repository": {
