@@ -1,4 +1,3 @@
-var define;
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -7380,7 +7379,7 @@ var define;
   }(Node));
 
   var regenerate = __commonjs(function (module, exports, global) {
-  /*! https://mths.be/regenerate v1.3.1 by @mathias | MIT license */
+  /*! https://mths.be/regenerate v1.3.2 by @mathias | MIT license */
   ;(function(root) {
 
   	// Detect free variables `exports`.
@@ -8275,14 +8274,10 @@ var define;
   		var end;
   		var startHigh;
   		var startLow;
-  		var prevStartHigh = 0;
-  		var prevEndHigh = 0;
-  		var tmpLow = [];
   		var endHigh;
   		var endLow;
   		var surrogateMappings = [];
   		var length = data.length;
-  		var dataHigh = [];
   		while (index < length) {
   			start = data[index];
   			end = data[index + 1] - 1;
@@ -8340,9 +8335,6 @@ var define;
   				]);
   			}
 
-  			prevStartHigh = startHigh;
-  			prevEndHigh = endHigh;
-
   			index += 2;
   		}
 
@@ -8383,7 +8375,6 @@ var define;
   		var loneLowSurrogates = parts.loneLowSurrogates;
   		var bmp = parts.bmp;
   		var astral = parts.astral;
-  		var hasAstral = !dataIsEmpty(parts.astral);
   		var hasLoneHighSurrogates = !dataIsEmpty(loneHighSurrogates);
   		var hasLoneLowSurrogates = !dataIsEmpty(loneLowSurrogates);
 
@@ -8442,7 +8433,7 @@ var define;
   		return (new regenerate).add(value);
   	};
 
-  	regenerate.version = '1.3.1';
+  	regenerate.version = '1.3.2';
 
   	var proto = regenerate.prototype;
   	extend(proto, {
@@ -12052,6 +12043,11 @@ var define;
   function transform ( source, options ) {
   	if ( options === void 0 ) options = {};
 
+  	return compile( source, options ).export( options );
+  }
+  function compile ( source, options ) {
+  	if ( options === void 0 ) options = {};
+
   	var ast;
 
   	try {
@@ -12082,11 +12078,12 @@ var define;
   		transforms[ name ] = options.transforms[ name ];
   	});
 
-  	return new Program( source, ast, transforms, options ).export( options );
+  	return new Program( source, ast, transforms, options );
   }
 
   exports.target = target;
   exports.transform = transform;
+  exports.compile = compile;
   exports.VERSION = version;
 
   Object.defineProperty(exports, '__esModule', { value: true });

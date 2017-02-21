@@ -25,17 +25,55 @@ module.exports = class {
 		this._componentElement = componentElement;
 	}
 
+	transpileScript( compilation ) {
+		const requires          = [];
+		const globalIdentifiers = {};
+		compilation.ast.body.forEach((node) => {
+			if ( node.type === 'ExportDefaultDeclaration' ) {
+				compilation.magicString.overwrite( node.start, node.declaration.start, "module.exports = " );
+				return;
+			}
+			if ( node.type === 'ExportNamedDeclaration' )
+				throw new Error( "Only export default is supported" );
+			if ( node.type === 'ImportDeclaration' ) {
+				const file = node.source.value;
+				const imports = [];
+				if ( requires.indexOf( file ) < 0 ) {
+					globalIdentifiers[ file ] = `v__guid__helper__${GUID_HELPER++}`;
+					requires.push( file );
+					imports.push( `var ${globalIdentifiers[ file ]} = require(${JSON.stringify(file)});` );
+				}
+
+				const identifier = globalIdentifiers[ file ];
+				if ( node.specifiers && node.specifiers.length > 0 ) {
+					for ( let i = 0, len = node.specifiers.length; i<len; ++i ) {
+						const specifier = node.specifiers[ i ];
+						if ( !specifier.imported ) {
+							imports.push( `var ${specifier.local.name} = ((${identifier} && ${identifier}.__esModule) ? ${identifier}['default'] : ${identifier})` );
+						} else {
+							imports.push( `var ${specifier.local.name} = ${identifier}[${JSON.stringify(specifier.imported.name)}]` );
+						}
+					}
+				}
+				
+
+				compilation.magicString.overwrite( node.start, node.end, imports.join("\n") );
+			}
+		});
+		return {
+			requires: requires,
+			code:     compilation.magicString.toString()
+		}
+	}
+
 	compileScript( output, options ) {
 		const script = this._componentElement.querySelector( 'script' );
 		if ( !script )
 			return;
 		
-		const transpiledScript = buble.transform( script.innerHTML );
-
-		const requires = [];
-		const code = transpiledScript.code.replace( /require\(\s*([\"'])((?:\\\1|.)*?)\1\s*\)/g, function( match, quote, moduleName ) {
-			requires.push( moduleName );
-		});
+		const compilation      = buble.compile( script.innerHTML, { transforms: { modules: false } } );
+		const transpiledScript = this.transpileScript( compilation );
+		const requires = transpiledScript.requires;
 		return options.require( requires )
 			.then( function( require ) {
 				const isolatedVm       = new Function( 'global', 'require', VM_HEADER+transpiledScript.code+VM_FOOTER );

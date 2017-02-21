@@ -20,6 +20,7 @@ require( 'promise/polyfill' );
 	const VueRequire = {
 		options: {},
 		_createRequire( options ) {
+			const g     = options.global || window;
 			const require = options.require || requireHelper.buildDependencyRequire({
 				require( deps, cb, errCb ) {
 					const dep = deps[0];
